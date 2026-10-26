@@ -1,11 +1,13 @@
 <?php
 
+// =============================================
+// 1. SESSION DAN KEAMANAN LOGIN
+// =============================================
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-// Pastikan pengguna sudah login dan role-nya valid.
 if (
     !isset($_SESSION['user']['id']) ||
     !isset($_SESSION['user']['role']) ||
@@ -19,7 +21,12 @@ if (
     exit;
 }
 
+// =============================================
+// 2. KONEKSI DATABASE
+// =============================================
+
 require_once __DIR__ . '/../config/database.php';
+
 if (!function_exists('e')) {
     function e($value): string
     {
@@ -33,31 +40,40 @@ if (!function_exists('e')) {
 
 date_default_timezone_set('Asia/Jakarta');
 
-/*
-|--------------------------------------------------------------------------
-| Mengambil ringkasan inventory
-|--------------------------------------------------------------------------
-*/
+$user = $_SESSION['user'];
+
+// =============================================
+// 3. MENGAMBIL DATA DASHBOARD
+// =============================================
 
 $stmt = $pdo->query("
     SELECT
-        (SELECT COUNT(*) FROM products) AS total_products,
-        (SELECT COUNT(*) FROM categories) AS total_categories,
-        (SELECT COUNT(*) FROM suppliers) AS total_suppliers,
+        (SELECT COUNT(*) FROM products)
+            AS total_products,
+
+        (SELECT COUNT(*) FROM categories)
+            AS total_categories,
+
+        (SELECT COUNT(*) FROM suppliers)
+            AS total_suppliers,
+
         (
             SELECT COALESCE(SUM(price * stock), 0)
             FROM products
         ) AS inventory_value,
+
         (
             SELECT COUNT(*)
             FROM products
             WHERE stock <= minimum_stock
         ) AS low_stock,
+
         (
             SELECT COALESCE(SUM(quantity), 0)
             FROM stock_movements
             WHERE `type` = 'IN'
         ) AS total_in,
+
         (
             SELECT COALESCE(SUM(quantity), 0)
             FROM stock_movements
@@ -67,12 +83,7 @@ $stmt = $pdo->query("
 
 $summary = $stmt->fetch();
 
-/*
-|--------------------------------------------------------------------------
-| Mengambil daftar produk
-|--------------------------------------------------------------------------
-*/
-
+// Mengambil lima produk terakhir.
 $productStmt = $pdo->query("
     SELECT
         p.id,
@@ -83,19 +94,15 @@ $productStmt = $pdo->query("
         p.stock,
         p.minimum_stock
     FROM products p
-    INNER JOIN categories c ON c.id = p.category_id
+    INNER JOIN categories c
+        ON c.id = p.category_id
     ORDER BY p.id DESC
     LIMIT 5
 ");
 
 $products = $productStmt->fetchAll();
 
-/*
-|--------------------------------------------------------------------------
-| Mengambil aktivitas stok terbaru
-|--------------------------------------------------------------------------
-*/
-
+// Mengambil lima aktivitas stok terakhir.
 $movementStmt = $pdo->query("
     SELECT
         sm.id,
@@ -105,17 +112,21 @@ $movementStmt = $pdo->query("
         p.name AS product_name,
         u.full_name
     FROM stock_movements sm
-    INNER JOIN products p ON p.id = sm.product_id
-    INNER JOIN users u ON u.id = sm.user_id
+    INNER JOIN products p
+        ON p.id = sm.product_id
+    INNER JOIN users u
+        ON u.id = sm.user_id
     ORDER BY sm.created_at DESC, sm.id DESC
     LIMIT 5
 ");
 
 $movements = $movementStmt->fetchAll();
+
 ?>
 
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
 
@@ -128,22 +139,18 @@ $movements = $movementStmt->fetchAll();
 
     <style>
         /* =====================================
-           1. PENGATURAN DASAR
+           WARNA TEMA SAMUDRA
         ===================================== */
 
         :root {
             --ocean-dark: #164e63;
             --ocean-text: #075985;
-            --ocean-primary: #38bdf8;
+            --ocean-primary: #0284c7;
             --ocean-light: #dff4fc;
             --ocean-pale: #f0faff;
             --ocean-border: #cceaf5;
             --ocean-muted: #64748b;
             --white: #ffffff;
-            --success-bg: #dcfce7;
-            --success-text: #166534;
-            --warning-bg: #ffedd5;
-            --warning-text: #9a3412;
         }
 
         * {
@@ -159,12 +166,11 @@ $movements = $movementStmt->fetchAll();
         }
 
         a {
-            text-decoration: none;
             color: inherit;
         }
 
         /* =====================================
-           2. SIDEBAR
+           SIDEBAR
         ===================================== */
 
         .sidebar {
@@ -173,52 +179,58 @@ $movements = $movementStmt->fetchAll();
             left: 0;
             bottom: 0;
             width: 245px;
-            padding: 28px 20px;
+            padding: 27px 19px;
+            overflow-y: auto;
+
             background: linear-gradient(
                 180deg,
-                #e0f7ff 0%,
-                #d9f2fa 55%,
-                #c9edf7 100%
+                #e0f7ff,
+                #d9f2fa,
+                #c9edf7
             );
+
             border-right: 1px solid var(--ocean-border);
-            overflow-y: auto;
         }
 
         .brand {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 42px;
+            margin-bottom: 38px;
         }
 
         .brand-icon {
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
+
             width: 46px;
             height: 46px;
             border-radius: 14px;
+
             background: linear-gradient(
                 135deg,
                 #38bdf8,
                 #5eead4
             );
+
             color: #083344;
-            font-size: 23px;
+            font-size: 24px;
             font-weight: bold;
-            box-shadow: 0 5px 12px rgba(56, 189, 248, 0.18);
         }
 
         .brand-name {
+            color: #075985;
             font-size: 17px;
             font-weight: 800;
-            color: #075985;
             letter-spacing: 0.4px;
         }
 
         .brand-name small {
             display: block;
             margin-top: 3px;
+
             color: #0e7490;
             font-size: 11px;
             font-weight: normal;
@@ -227,29 +239,32 @@ $movements = $movementStmt->fetchAll();
 
         .menu-label {
             margin: 0 0 13px 10px;
+
             color: #52859a;
             font-size: 10px;
             font-weight: bold;
-            letter-spacing: 1.2px;
+            letter-spacing: 1.1px;
         }
 
         .nav-item {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px 14px;
-            margin-bottom: 8px;
-            border-radius: 11px;
+
+            padding: 12px 13px;
+            margin-bottom: 7px;
+
+            border-radius: 10px;
+
             color: #28667f;
-            font-size: 14px;
-            transition:
-                background 0.2s ease,
-                color 0.2s ease,
-                transform 0.2s ease;
+            font-size: 13px;
+            text-decoration: none;
+
+            transition: 0.2s ease;
         }
 
         .nav-item:hover {
-            background: rgba(125, 211, 252, 0.35);
+            background: rgba(125, 211, 252, 0.45);
             color: #075985;
             transform: translateX(2px);
         }
@@ -260,28 +275,33 @@ $movements = $movementStmt->fetchAll();
                 #7dd3fc,
                 #99f6e4
             );
+
             color: #083344;
             font-weight: bold;
-            box-shadow: 0 5px 12px rgba(14, 116, 144, 0.10);
+
+            box-shadow: 0 5px 12px rgba(14, 116, 144, 0.08);
         }
 
         .nav-icon {
             width: 23px;
+            flex-shrink: 0;
             text-align: center;
             font-size: 17px;
         }
 
         .sidebar-bottom {
-            margin-top: 35px;
+            margin-top: 28px;
             padding: 15px;
+
             border: 1px solid #bce5f3;
             border-radius: 12px;
+
             background: rgba(255, 255, 255, 0.55);
         }
 
         .sidebar-bottom strong {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             font-size: 12px;
             color: #075985;
         }
@@ -294,27 +314,28 @@ $movements = $movementStmt->fetchAll();
         }
 
         /* =====================================
-           3. KONTEN UTAMA
+           KONTEN UTAMA
         ===================================== */
 
         main {
-            margin-left: 245px;
-            padding: 32px;
             min-height: 100vh;
+            margin-left: 245px;
+            padding: 30px;
         }
 
         .topbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 20px;
-            margin-bottom: 26px;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
         }
 
         .page-title {
             margin: 0 0 5px;
-            color: #164e63;
-            font-size: 28px;
+            color: var(--ocean-dark);
+            font-size: 27px;
             font-weight: 800;
         }
 
@@ -324,44 +345,80 @@ $movements = $movementStmt->fetchAll();
             font-size: 13px;
         }
 
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
         .date-box {
-            padding: 10px 15px;
+            padding: 10px 13px;
+
             border: 1px solid var(--ocean-border);
-            border-radius: 12px;
+            border-radius: 9px;
+
             background: white;
             color: #0e7490;
             font-size: 12px;
-            white-space: nowrap;
+        }
+
+        .logout-button {
+            display: inline-block;
+            padding: 10px 14px;
+
+            border: 1px solid var(--ocean-border);
+            border-radius: 9px;
+
+            background: #dff4fc;
+            color: #075985;
+
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: none;
+
+            transition: 0.2s;
+        }
+
+        .logout-button:hover {
+            background: #bae6fd;
         }
 
         /* =====================================
-           4. BANNER SAMBUTAN
+           BANNER
         ===================================== */
 
         .welcome {
             position: relative;
             overflow: hidden;
-            margin-bottom: 25px;
+
+            margin-bottom: 27px;
             padding: 28px;
+
             border: 1px solid #a5e6ee;
-            border-radius: 18px;
+            border-radius: 17px;
+
             background: linear-gradient(
                 120deg,
-                #7dd3fc 0%,
+                #7dd3fc,
                 #a5f3fc 55%,
-                #99f6e4 100%
+                #99f6e4
             );
-            box-shadow: 0 8px 22px rgba(14, 116, 144, 0.07);
+
+            box-shadow: 0 8px 22px rgba(14, 116, 144, 0.06);
         }
 
         .welcome::after {
             content: "";
+
             position: absolute;
+            top: -90px;
+            right: -45px;
+
             width: 200px;
             height: 200px;
-            right: -55px;
-            top: -90px;
-            border: 28px solid rgba(255, 255, 255, 0.25);
+
+            border: 28px solid rgba(255, 255, 255, 0.22);
             border-radius: 50%;
         }
 
@@ -375,12 +432,14 @@ $movements = $movementStmt->fetchAll();
             display: inline-block;
             margin-bottom: 12px;
             padding: 5px 10px;
+
             border-radius: 20px;
             background: rgba(255, 255, 255, 0.55);
+
             color: #0e7490;
             font-size: 10px;
             font-weight: bold;
-            letter-spacing: 0.7px;
+            letter-spacing: 0.6px;
         }
 
         .welcome h2 {
@@ -391,22 +450,17 @@ $movements = $movementStmt->fetchAll();
 
         .welcome p {
             margin: 0;
-            max-width: 550px;
             color: #164e63;
             font-size: 13px;
             line-height: 1.8;
         }
 
         /* =====================================
-           5. KARTU STATISTIK
+           JUDUL BAGIAN
         ===================================== */
 
         .section-heading {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            margin: 30px 0 16px;
+            margin: 28px 0 15px;
         }
 
         .section-heading h2 {
@@ -421,25 +475,29 @@ $movements = $movementStmt->fetchAll();
             font-size: 12px;
         }
 
+        /* =====================================
+           KARTU STATISTIK
+        ===================================== */
+
         .cards {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 16px;
+            gap: 15px;
             margin-bottom: 25px;
         }
 
         .card {
-            position: relative;
-            overflow: hidden;
             min-width: 0;
-            padding: 21px;
-            background: white;
+            padding: 19px;
+
             border: 1px solid var(--ocean-border);
-            border-radius: 15px;
+            border-radius: 14px;
+
+            background: white;
+
             box-shadow: 0 5px 16px rgba(14, 116, 144, 0.035);
-            transition:
-                transform 0.2s ease,
-                box-shadow 0.2s ease;
+
+            transition: 0.2s ease;
         }
 
         .card:hover {
@@ -452,7 +510,7 @@ $movements = $movementStmt->fetchAll();
             justify-content: space-between;
             align-items: center;
             gap: 8px;
-            margin-bottom: 17px;
+            margin-bottom: 16px;
         }
 
         .card-label {
@@ -463,27 +521,29 @@ $movements = $movementStmt->fetchAll();
 
         .card-icon {
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             flex-shrink: 0;
-            width: 39px;
-            height: 39px;
-            border-radius: 12px;
+
+            width: 37px;
+            height: 37px;
+
+            border-radius: 11px;
+
             background: #e0f7ff;
             color: #087eab;
-            font-size: 20px;
+            font-size: 19px;
         }
 
         .card-value {
-            overflow-wrap: anywhere;
-            color: #164e63;
+            color: var(--ocean-dark);
             font-size: 27px;
             font-weight: 800;
-            letter-spacing: -0.7px;
+            overflow-wrap: anywhere;
         }
 
         .card-value.currency {
-            font-size: 19px;
+            font-size: 18px;
         }
 
         .card-description {
@@ -492,31 +552,34 @@ $movements = $movementStmt->fetchAll();
             font-size: 11px;
         }
 
-        .card.low-card .card-icon {
+        .card-low .card-icon {
             background: #fff0d9;
             color: #b45309;
         }
 
-        .card.in-card .card-icon {
+        .card-in .card-icon {
             background: #dcfce7;
             color: #15803d;
         }
 
-        .card.out-card .card-icon {
+        .card-out .card-icon {
             background: #ffe4e6;
             color: #be123c;
         }
 
         /* =====================================
-           6. PANEL DAN TABEL
+           PANEL DAN TABEL
         ===================================== */
 
         .panel {
             margin-bottom: 24px;
             overflow: hidden;
-            background: white;
+
             border: 1px solid var(--ocean-border);
-            border-radius: 15px;
+            border-radius: 14px;
+
+            background: white;
+
             box-shadow: 0 5px 16px rgba(14, 116, 144, 0.035);
         }
 
@@ -525,29 +588,33 @@ $movements = $movementStmt->fetchAll();
             justify-content: space-between;
             align-items: center;
             gap: 12px;
-            padding: 21px 23px;
+
+            padding: 20px 22px;
+
             border-bottom: 1px solid #e7f3f8;
         }
 
         .panel-header h2 {
             margin: 0;
-            color: #164e63;
+            color: var(--ocean-dark);
             font-size: 16px;
         }
 
         .panel-header p {
-            margin: 5px 0 0;
+            margin: 4px 0 0;
             color: #8a9ba9;
             font-size: 11px;
         }
 
         .panel-icon {
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
+
             width: 36px;
             height: 36px;
-            border-radius: 11px;
+
+            border-radius: 10px;
             background: #e0f7ff;
             color: #087eab;
             font-size: 18px;
@@ -563,24 +630,29 @@ $movements = $movementStmt->fetchAll();
             border-collapse: collapse;
             text-align: left;
             font-size: 12px;
-            white-space: nowrap;
         }
 
-        thead th {
-            padding: 14px 20px;
+        th {
+            padding: 13px 17px;
+
             background: #effaff;
             color: #35748b;
+
             font-size: 10px;
             font-weight: 800;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
             text-transform: uppercase;
+            white-space: nowrap;
+
             border-bottom: 1px solid #dff0f7;
         }
 
-        tbody td {
-            padding: 16px 20px;
+        td {
+            padding: 15px 17px;
+
             color: #526b7a;
             border-bottom: 1px solid #edf4f7;
+            vertical-align: middle;
         }
 
         tbody tr:last-child td {
@@ -594,6 +666,7 @@ $movements = $movementStmt->fetchAll();
         .sku {
             color: #0e7490;
             font-weight: bold;
+            white-space: nowrap;
         }
 
         .product-name {
@@ -604,6 +677,7 @@ $movements = $movementStmt->fetchAll();
         .price {
             color: #164e63;
             font-weight: 600;
+            white-space: nowrap;
         }
 
         .stock-number {
@@ -612,57 +686,53 @@ $movements = $movementStmt->fetchAll();
         }
 
         .badge {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            padding: 5px 10px;
+            display: inline-block;
+            padding: 5px 9px;
             border-radius: 20px;
+
             font-size: 10px;
             font-weight: bold;
+            white-space: nowrap;
         }
 
         .badge-low {
-            color: var(--warning-text);
-            background: var(--warning-bg);
+            background: #ffedd5;
+            color: #9a3412;
         }
 
         .badge-ok {
-            color: var(--success-text);
-            background: var(--success-bg);
+            background: #dcfce7;
+            color: #166534;
         }
 
         .badge-in {
-            color: #166534;
             background: #dcfce7;
+            color: #166534;
         }
 
         .badge-out {
-            color: #9f1239;
             background: #ffe4e6;
+            color: #9f1239;
         }
 
         .empty {
-            padding: 32px 20px;
-            color: #8a9ba9;
+            padding: 28px 18px;
             text-align: center;
-            white-space: normal;
-        }
-
-        .empty-icon {
-            display: block;
-            margin-bottom: 9px;
-            font-size: 25px;
+            color: #8a9ba9;
         }
 
         /* =====================================
-           7. BAGIAN BAWAH
+           FOOTER
         ===================================== */
 
         .footer {
             display: flex;
             justify-content: space-between;
             gap: 12px;
+            flex-wrap: wrap;
+
             padding: 12px 3px;
+
             color: #8a9ba9;
             font-size: 11px;
         }
@@ -672,7 +742,7 @@ $movements = $movementStmt->fetchAll();
         }
 
         /* =====================================
-           8. RESPONSIVE
+           RESPONSIVE
         ===================================== */
 
         @media (max-width: 1200px) {
@@ -681,7 +751,7 @@ $movements = $movementStmt->fetchAll();
             }
 
             main {
-                padding: 25px;
+                padding: 24px;
             }
         }
 
@@ -696,26 +766,18 @@ $movements = $movementStmt->fetchAll();
                 margin-bottom: 22px;
             }
 
-            .menu-label {
-                margin-top: 12px;
-            }
-
-            .sidebar-bottom {
-                margin-top: 20px;
-            }
-
             main {
                 margin-left: 0;
                 padding: 18px;
             }
 
+            .page-title {
+                font-size: 24px;
+            }
+
             .topbar {
                 align-items: flex-start;
                 flex-direction: column;
-            }
-
-            .page-title {
-                font-size: 24px;
             }
 
             .welcome {
@@ -724,10 +786,6 @@ $movements = $movementStmt->fetchAll();
 
             .welcome h2 {
                 font-size: 20px;
-            }
-
-            .cards {
-                gap: 12px;
             }
 
             .card {
@@ -739,11 +797,7 @@ $movements = $movementStmt->fetchAll();
             }
 
             .card-value.currency {
-                font-size: 17px;
-            }
-
-            .panel-header {
-                padding: 17px;
+                font-size: 16px;
             }
         }
 
@@ -762,7 +816,7 @@ $movements = $movementStmt->fetchAll();
 <body>
 
 <!-- =====================================
-     SIDEBAR
+     SIDEBAR DAN LINK NAVIGASI
 ===================================== -->
 
 <aside class="sidebar">
@@ -778,58 +832,60 @@ $movements = $movementStmt->fetchAll();
 
     <p class="menu-label">MENU UTAMA</p>
 
-    <div class="nav-item active">
+    <a class="nav-item active" href="dashboard.php">
         <span class="nav-icon">⌂</span>
         <span>Dashboard</span>
-    </div>
+    </a>
 
-    <div class="nav-item">
+    <a class="nav-item" href="products/index.php">
         <span class="nav-icon">▦</span>
         <span>Produk</span>
-    </div>
+    </a>
 
-    <div class="nav-item">
+    <a class="nav-item" href="categories/index.php">
         <span class="nav-icon">▤</span>
         <span>Kategori</span>
-    </div>
+    </a>
 
-    <div class="nav-item">
+    <a class="nav-item" href="suppliers/index.php">
         <span class="nav-icon">♧</span>
         <span>Supplier</span>
-    </div>
+    </a>
 
-    <div class="nav-item">
+    <a class="nav-item" href="stock/index.php">
         <span class="nav-icon">↕</span>
         <span>Transaksi Stok</span>
-    </div>
+    </a>
 
-    <div class="nav-item">
+    <a class="nav-item" href="reports/index.php">
         <span class="nav-icon">▥</span>
         <span>Laporan</span>
-    </div>
+    </a>
 
-    <div class="nav-item">
+    <a class="nav-item" href="users/index.php">
         <span class="nav-icon">♙</span>
         <span>Pengguna</span>
-    </div>
+    </a>
 
     <div class="sidebar-bottom">
         <strong>Inventory System</strong>
+
         <p>
-            Kelola produk, stok, dan pemasok
-            dalam satu sistem terintegrasi.
+            Kelola produk, kategori, pemasok, dan stok
+            melalui satu sistem terintegrasi.
         </p>
     </div>
 
 </aside>
 
 <!-- =====================================
-     KONTEN DASHBOARD
+     KONTEN UTAMA DASHBOARD
 ===================================== -->
 
 <main>
 
     <header class="topbar">
+
         <div>
             <h1 class="page-title">Dashboard</h1>
 
@@ -838,63 +894,62 @@ $movements = $movementStmt->fetchAll();
             </p>
         </div>
 
-<div style="display: flex; align-items: center; gap: 10px;">
-    <div class="date-box">
-        ◷ &nbsp; <?= e(date('d F Y')) ?>
-    </div>
+        <div class="topbar-actions">
 
-    <a
-        href="logout.php"
-        style="
-            display: inline-block;
-            padding: 10px 15px;
-            border-radius: 9px;
-            background: #dff4fc;
-            color: #075985;
-            border: 1px solid #cceaf5;
-            text-decoration: none;
-            font-size: 12px;
-            font-weight: bold;
-        "
-    >
-        Logout
-    </a>
-</div>
+            <div class="date-box">
+                ◷ &nbsp; <?= e(date('d F Y')) ?>
+            </div>
+
+            <a
+                href="logout.php"
+                class="logout-button"
+            >
+                Logout
+            </a>
+
+        </div>
+
     </header>
 
-    <!-- Banner sambutan -->
+    <!-- BANNER -->
 
     <section class="welcome">
+
         <div class="welcome-content">
 
             <span class="welcome-label">
                 INVENTORY OVERVIEW
             </span>
 
-            <h2>Selamat Datang di Inventory System!</h2>
+            <h2>
+                Selamat datang, <?= e($user['full_name'] ?? $user['username']) ?>!
+            </h2>
 
             <p>
-                Pantau persediaan barang, informasi pemasok,
-                dan aktivitas transaksi stok melalui dashboard
-                ini. Semua informasi utama tersedia dalam satu
-                halaman agar pengelolaan inventory lebih mudah.
+                Pantau persediaan barang, kategori, pemasok,
+                dan transaksi stok dari satu halaman.
+                Informasi inventory ditampilkan secara ringkas
+                untuk membantu pengelolaan barang.
             </p>
 
         </div>
+
     </section>
 
-    <!-- Statistik -->
+    <!-- STATISTIK -->
 
     <div class="section-heading">
-        <div>
-            <h2>Ringkasan Inventory</h2>
-            <p>Ikhtisar data yang tersimpan di database.</p>
-        </div>
+
+        <h2>Ringkasan Inventory</h2>
+
+        <p>Ikhtisar data dari database inventory.</p>
+
     </div>
 
     <section class="cards">
 
         <div class="card">
+
             <div class="card-top">
                 <span class="card-label">Total Produk</span>
                 <span class="card-icon">▦</span>
@@ -907,9 +962,11 @@ $movements = $movementStmt->fetchAll();
             <div class="card-description">
                 Jumlah produk terdaftar
             </div>
+
         </div>
 
         <div class="card">
+
             <div class="card-top">
                 <span class="card-label">Total Kategori</span>
                 <span class="card-icon">▤</span>
@@ -922,9 +979,11 @@ $movements = $movementStmt->fetchAll();
             <div class="card-description">
                 Kategori produk
             </div>
+
         </div>
 
         <div class="card">
+
             <div class="card-top">
                 <span class="card-label">Total Supplier</span>
                 <span class="card-icon">♧</span>
@@ -937,9 +996,11 @@ $movements = $movementStmt->fetchAll();
             <div class="card-description">
                 Pemasok terdaftar
             </div>
+
         </div>
 
         <div class="card">
+
             <div class="card-top">
                 <span class="card-label">Nilai Inventory</span>
                 <span class="card-icon">Rp</span>
@@ -955,11 +1016,13 @@ $movements = $movementStmt->fetchAll();
             </div>
 
             <div class="card-description">
-                Total harga dikalikan jumlah stok
+                Harga dikalikan jumlah stok
             </div>
+
         </div>
 
-        <div class="card low-card">
+        <div class="card card-low">
+
             <div class="card-top">
                 <span class="card-label">Stok Rendah</span>
                 <span class="card-icon">!</span>
@@ -970,11 +1033,13 @@ $movements = $movementStmt->fetchAll();
             </div>
 
             <div class="card-description">
-                Produk pada atau di bawah stok minimum
+                Produk di bawah atau pada stok minimum
             </div>
+
         </div>
 
-        <div class="card in-card">
+        <div class="card card-in">
+
             <div class="card-top">
                 <span class="card-label">Barang Masuk</span>
                 <span class="card-icon">↓</span>
@@ -987,9 +1052,11 @@ $movements = $movementStmt->fetchAll();
             <div class="card-description">
                 Total unit barang masuk
             </div>
+
         </div>
 
-        <div class="card out-card">
+        <div class="card card-out">
+
             <div class="card-top">
                 <span class="card-label">Barang Keluar</span>
                 <span class="card-icon">↑</span>
@@ -1002,25 +1069,33 @@ $movements = $movementStmt->fetchAll();
             <div class="card-description">
                 Total unit barang keluar
             </div>
+
         </div>
 
     </section>
 
-    <!-- Daftar produk -->
+    <!-- DAFTAR PRODUK -->
 
     <section class="panel">
 
         <div class="panel-header">
+
             <div>
                 <h2>Daftar Produk</h2>
-                <p>Lima produk terakhir yang terdaftar.</p>
+
+                <p>
+                    Lima produk terakhir yang terdaftar.
+                </p>
             </div>
 
             <div class="panel-icon">▦</div>
+
         </div>
 
         <div class="table-wrap">
+
             <table>
+
                 <thead>
                     <tr>
                         <th>SKU</th>
@@ -1038,7 +1113,6 @@ $movements = $movementStmt->fetchAll();
 
                     <tr>
                         <td colspan="6" class="empty">
-                            <span class="empty-icon">▦</span>
                             Belum ada produk yang terdaftar.
                         </td>
                     </tr>
@@ -1048,6 +1122,7 @@ $movements = $movementStmt->fetchAll();
                     <?php foreach ($products as $product): ?>
 
                         <tr>
+
                             <td class="sku">
                                 <?= e($product['sku']) ?>
                             </td>
@@ -1074,6 +1149,7 @@ $movements = $movementStmt->fetchAll();
                             </td>
 
                             <td>
+
                                 <?php if (
                                     (int) $product['stock']
                                     <= (int) $product['minimum_stock']
@@ -1090,7 +1166,9 @@ $movements = $movementStmt->fetchAll();
                                     </span>
 
                                 <?php endif; ?>
+
                             </td>
+
                         </tr>
 
                     <?php endforeach; ?>
@@ -1098,26 +1176,35 @@ $movements = $movementStmt->fetchAll();
                 <?php endif; ?>
 
                 </tbody>
+
             </table>
+
         </div>
 
     </section>
 
-    <!-- Aktivitas stok -->
+    <!-- AKTIVITAS STOK -->
 
     <section class="panel">
 
         <div class="panel-header">
+
             <div>
                 <h2>Aktivitas Stok Terbaru</h2>
-                <p>Riwayat perubahan stok yang tercatat.</p>
+
+                <p>
+                    Riwayat perubahan stok yang tercatat.
+                </p>
             </div>
 
             <div class="panel-icon">↕</div>
+
         </div>
 
         <div class="table-wrap">
+
             <table>
+
                 <thead>
                     <tr>
                         <th>Tanggal</th>
@@ -1134,9 +1221,8 @@ $movements = $movementStmt->fetchAll();
 
                     <tr>
                         <td colspan="5" class="empty">
-                            <span class="empty-icon">↕</span>
                             Belum ada transaksi stok.
-                            Riwayat akan muncul setelah transaksi pertama.
+                            Aktivitas akan ditampilkan setelah transaksi pertama.
                         </td>
                     </tr>
 
@@ -1145,6 +1231,7 @@ $movements = $movementStmt->fetchAll();
                     <?php foreach ($movements as $movement): ?>
 
                         <tr>
+
                             <td>
                                 <?= e(date(
                                     'd-m-Y H:i',
@@ -1157,6 +1244,7 @@ $movements = $movementStmt->fetchAll();
                             </td>
 
                             <td>
+
                                 <?php if ($movement['type'] === 'IN'): ?>
 
                                     <span class="badge badge-in">
@@ -1170,6 +1258,7 @@ $movements = $movementStmt->fetchAll();
                                     </span>
 
                                 <?php endif; ?>
+
                             </td>
 
                             <td class="stock-number">
@@ -1179,6 +1268,7 @@ $movements = $movementStmt->fetchAll();
                             <td>
                                 <?= e($movement['full_name']) ?>
                             </td>
+
                         </tr>
 
                     <?php endforeach; ?>
@@ -1186,20 +1276,26 @@ $movements = $movementStmt->fetchAll();
                 <?php endif; ?>
 
                 </tbody>
+
             </table>
+
         </div>
 
     </section>
 
-    <!-- Footer -->
+    <!-- FOOTER -->
 
     <footer class="footer">
+
         <span>
             © <?= e(date('Y')) ?>
             <strong>Inventory Management System</strong>
         </span>
 
-        <span>Relational Database + Advanced PHP</span>
+        <span>
+            Relational Database + Advanced PHP
+        </span>
+
     </footer>
 
 </main>

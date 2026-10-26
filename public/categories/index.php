@@ -1,6 +1,27 @@
 
 <?php
-session_start();
+
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
+// Pengguna harus login terlebih dahulu.
+if (
+    !isset($_SESSION['user']['id']) ||
+    !isset($_SESSION['user']['role'])
+) {
+    header('Location: ../login.php');
+    exit;
+}
+
+// Hanya admin yang boleh mengelola kategori.
+if ($_SESSION['user']['role'] !== 'admin') {
+    http_response_code(403);
+    exit(
+        '403 Forbidden: Hanya admin yang boleh mengelola kategori.'
+    );
+}
 
 require_once __DIR__ . '/../../config/database.php';
 
